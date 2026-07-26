@@ -1,0 +1,24 @@
+# Simulation
+*.vcd
+*.wlf
+*.log
+*.jou
+*.pb
+*.str
+*.wdb
+
+# Vivado
+.cache/
+.hw/
+.ip_user_files/
+.sim/
+.runs/
+.Xil/
+
+# Quartus
+db/
+incremental_db/
+
+# Temporary
+*.tmp
+*.bak
