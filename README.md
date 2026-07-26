@@ -1,23 +1,20 @@
-# AXI4-Lite Slave Peripheral in Verilog
+# AXI4-Lite Slave Peripheral
 
-A standalone implementation of an **AXI4-Lite Slave Peripheral** written in **Verilog**. The project is designed for RTL design learning and interview preparation, demonstrating the implementation of the AXI4-Lite protocol using finite state machines (FSMs) along with a simple self-checking Verilog testbench.
+A standalone implementation of an **AXI4-Lite Slave Peripheral** supporting memory-mapped read and write transactions through the AXI4-Lite protocol. The design implements independent read and write finite state machines (FSMs), a three-register memory map, byte-enable writes using `WSTRB`, and protocol-compliant VALID/READY handshaking. A self-checking testbench verifies the functionality through directed protocol tests.
 
 ---
 
 ## Features
 
-- Verilog-2001 implementation
-- Standalone AXI4-Lite Slave Peripheral
 - 32-bit Address Bus
 - 32-bit Data Bus
 - Three memory-mapped 32-bit registers
 - Independent Read and Write FSMs
-- Correct VALID/READY handshake implementation
-- Supports independent AW and W channel arrivals
-- Byte-enable writes using `WSTRB`
+- AXI4-Lite compliant VALID/READY handshake
+- Independent handling of Write Address (AW) and Write Data (W) channels
+- Byte-enable write support using `WSTRB`
 - OKAY and SLVERR response generation
-- Self-checking Verilog testbench
-- Directed protocol verification (No UVM)
+- Self-checking testbench with directed verification
 
 ---
 
@@ -48,21 +45,31 @@ axi-lite-slave-verilog/
 
 ## Architecture
 
-The AXI4-Lite Slave consists of two independent finite state machines.
+The AXI4-Lite slave is organized around two independent finite state machines.
 
-- **Write FSM**
-  - Handles AW, W and B channels
-  - Supports independent arrival of write address and write data
-  - Performs register write operations
-  - Generates write response
+### Write FSM
 
-- **Read FSM**
-  - Handles AR and R channels
-  - Latches read address
-  - Reads register contents
-  - Generates read response
+The write FSM manages the AXI write address, write data, and write response channels.
 
-The slave contains a simple memory-mapped register file consisting of three 32-bit registers.
+Its responsibilities include:
+
+- Receiving write addresses
+- Receiving write data
+- Supporting independent arrival of AW and W channels
+- Decoding register addresses
+- Updating the register file
+- Generating write responses
+
+### Read FSM
+
+The read FSM manages the AXI read address and read data channels.
+
+Its responsibilities include:
+
+- Receiving read addresses
+- Decoding register addresses
+- Reading register contents
+- Returning read data and response signals
 
 ### Block Diagram
 
@@ -76,9 +83,9 @@ The slave contains a simple memory-mapped register file consisting of three 32-b
 
 | Address | Register | Access |
 |----------|----------|--------|
-| 0x00 | REG0 | Read / Write |
-| 0x04 | REG1 | Read / Write |
-| 0x08 | REG2 | Read / Write |
+| `0x00` | REG0 | Read / Write |
+| `0x04` | REG1 | Read / Write |
+| `0x08` | REG2 | Read / Write |
 
 ---
 
@@ -89,93 +96,76 @@ The slave contains a simple memory-mapped register file consisting of three 32-b
 | **Global** | `ACLK` | Global clock |
 | | `ARESETn` | Active-low reset |
 | **Write Address** | `AWADDR` | Write address |
-| | `AWVALID` | Write address valid |
+| | `AWVALID` | Indicates a valid write address |
 | | `AWREADY` | Slave ready to accept write address |
 | **Write Data** | `WDATA` | Write data |
-| | `WSTRB` | Write byte strobes |
-| | `WVALID` | Write data valid |
+| | `WSTRB` | Byte-enable strobes |
+| | `WVALID` | Indicates valid write data |
 | | `WREADY` | Slave ready to accept write data |
 | **Write Response** | `BRESP` | Write response |
 | | `BVALID` | Write response valid |
-| | `BREADY` | Master accepts write response |
+| | `BREADY` | Master accepts response |
 | **Read Address** | `ARADDR` | Read address |
-| | `ARVALID` | Read address valid |
+| | `ARVALID` | Indicates a valid read address |
 | | `ARREADY` | Slave ready to accept read address |
 | **Read Data** | `RDATA` | Read data |
 | | `RRESP` | Read response |
 | | `RVALID` | Read data valid |
 | | `RREADY` | Master accepts read data |
 
-> **Note:** Every AXI4-Lite channel operates independently using the VALID/READY handshake. A transfer occurs only when both `VALID` and `READY` are asserted during the same clock cycle.
+> **Note:** Each AXI4-Lite channel uses an independent VALID/READY handshake. A transfer occurs only when both `VALID` and `READY` are asserted during the same clock cycle.
 
 ---
 
-## Design Highlights
+## Protocol Operation
 
-- Two independent finite state machines for read and write transactions.
-- Supports independent arrival of Write Address (AW) and Write Data (W) channels.
-- Implements proper AXI4-Lite VALID/READY handshake protocol.
-- Supports byte-level writes using `WSTRB`.
-- Implements memory-mapped register access.
-- Returns `OKAY` for valid transactions and `SLVERR` for invalid accesses.
+### Write Transaction
+
+1. The master sends a write address on the AW channel.
+2. The master sends write data on the W channel.
+3. The slave independently accepts both channels.
+4. Once both address and data are available, the corresponding register is updated.
+5. The slave returns a write response on the B channel.
+
+### Read Transaction
+
+1. The master sends a read address on the AR channel.
+2. The slave decodes the address.
+3. The requested register value is returned on the R channel.
+4. The transaction completes after the RVALID/RREADY handshake.
 
 ---
 
 ## Verification
 
-A simple self-checking Verilog testbench is included.
+The testbench performs protocol verification using reusable AXI master tasks.
 
-The verification environment intentionally avoids:
-
-- UVM
-- Assertions
-- Functional Coverage
-- Scoreboards
-- Monitors
-- Drivers
-- Agents
-
-Instead, it uses two reusable tasks:
-
-- `axi_write()`
-- `axi_read()`
-
-to perform AXI4-Lite transactions.
-
----
-
-## Directed Test Cases
-
-The following protocol tests are implemented:
+Implemented tests include:
 
 - Reset Test
-- Write REG0
-- Write REG1
-- Write REG2
-- Overwrite Register Test
-- Write All Registers
-- Partial Write Test (`WSTRB`)
-- Invalid Address Test
-- Back-to-Back Writes
-- Back-to-Back Reads
-- Independent AW and W Arrival Test
+- Register Read/Write
+- Register Overwrite
+- Full Register Map Verification
+- Partial Write using `WSTRB`
+- Invalid Address Access
+- Back-to-Back Write Transactions
+- Back-to-Back Read Transactions
+- Independent AW and W Channel Arrival
 
-Each test automatically reports **PASS** or **FAIL**.
+Each test automatically checks the expected result and reports **PASS** or **FAIL**.
 
 ---
 
 ## Simulation Results
 
-Simulation confirms:
+Simulation verifies:
 
 - Correct VALID/READY handshaking
-- Successful write transactions
-- Successful read transactions
+- Independent operation of read and write channels
 - Correct address decoding
-- Proper write response generation
-- Proper read response generation
-- Correct `WSTRB` functionality
-- Independent handling of AW and W channels
+- Register read/write functionality
+- Proper write and read response generation
+- Correct byte-enable (`WSTRB`) operation
 
 ### RTL Schematic
 
@@ -193,32 +183,22 @@ Simulation confirms:
 
 ## Skills Demonstrated
 
-- Verilog RTL Design
-- Finite State Machine (FSM) Design
-- AMBA AXI4-Lite Protocol
+- AXI4-Lite Protocol Implementation
+- RTL Design
+- Finite State Machine Design
 - Memory-Mapped Peripheral Design
 - Register File Design
 - Address Decoding
 - Byte Enable (`WSTRB`) Handling
-- RTL Verification
+- Protocol Verification
 - Self-Checking Testbench Development
-- Digital System Design
 
 ---
 
-## Future Improvements
+## Future Enhancements
 
-Possible extensions include:
-
-- Parameterizable number of registers
-- Parameterizable address and data widths
-- Interrupt generation
-- AXI4-Full interface implementation
-- Formal protocol verification
-- SystemVerilog assertion-based verification
-
----
-
-## License
-
-This project is released under the MIT License.
+- Parameterizable register count
+- Configurable address and data widths
+- Additional memory-mapped peripherals
+- Interrupt support
+- AXI4-Full interface
